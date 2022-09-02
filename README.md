@@ -1,5 +1,7 @@
 # pico-telemetry
 Vehicle telemetry logging for the Raspberry Pi Pico written in microPython for now. Future plans for C++
+
+telemetry_micropyGPS should be considered historical, and will not be receiving much, if any, updates.
 ## Required hardware:
  * Raspberry Pi Pico
  * microSD Card with its full size adapter to have pins soldered to, or an SD daughter board that actually functions at 3.3v
@@ -13,7 +15,7 @@ These libraries are required in the pico's lib folder:
 
    And one of the following:
  * [Peter Hinch's as_GPS.py](https://github.com/peterhinch/micropython-async/tree/master/v3/as_drivers/as_GPS) for the async version.
- * [Calvin McCoy's micropyGPS.py](https://github.com/inmcm/micropyGPS) if choosing the non-async version. Version to be depreciated due to performance issues without async.
+ * [Calvin McCoy's micropyGPS.py](https://github.com/inmcm/micropyGPS) if choosing the non-async version. Version to be depreciated due to performance issues without async. Currently still needed for async version.
 ## UBX_PICO.py
 This file has code to speak the language of the u-blox GPS receiver.
 
