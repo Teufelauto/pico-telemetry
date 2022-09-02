@@ -12,7 +12,7 @@
 
 #---------------------+             Connects to:
 #                   []  \   <-- No connection
-#                     [] |  CS       SPIx SCK
+#                     [] |  CS       SPIx CSn
 #                     [] |  MOSI     SPIx TX
 #       Micro to      [] |  GND      Ground
 #         SD          [] |  VCC      3v3(OUT)
