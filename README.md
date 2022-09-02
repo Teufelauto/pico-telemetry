@@ -47,3 +47,19 @@ Includes initial setup of the u-blox m8c GPS for:
 Includes a function to calculate the checksum of ubx messages, and if this code is executed as __main__, can be used to check and output checksums by placing the 'ubx byte-code in question' towards the top of the code after "message = ".
 
 Eventually, this file will handle the ubx-pvt messages, much as micropyGPS or as_GPS do for NMEA, and those files will be unneeded.
+# SD Card
+
+
+
+---------------------+             Connects to:
+                   []  \   <-- No connection      
+                     [] |  CS       SPIx SCK
+                     [] |  MOSI     SPIx TX      
+       Micro to      [] |  GND      Ground     
+         SD          [] |  VCC      3v3(OUT)  
+       Adapter       [] |  SCK      SPIx SCK   
+                     [] |  GND      Ground    
+                     [] |  MISO     SPIx RX   
+                     [] |  <-- No connection 
+------------------------+
+
