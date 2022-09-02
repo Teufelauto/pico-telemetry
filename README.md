@@ -7,7 +7,7 @@ This software is in very early development, and I'm very much an amateur. Do not
 ## Required hardware:
  * Raspberry Pi Pico
  * microSD Card with its full size adapter to have pins soldered to, or an SD daughter board that actually functions at 3.3v
- * BerryGPS-IMU-4 or other comprised of:
+ * [BerryGPS-IMU-4](https://ozzmaker.com/berrygps-berrygps-imu-quick-start-guide/#) or other comprised of:
    - u-blox M8 gps receiver
    - LSM6DSL inertial module
  * Future plans for MCP3208 12-bit Analog to Digital Converter to gather sensor data
@@ -47,19 +47,12 @@ Includes initial setup of the u-blox m8c GPS for:
 Includes a function to calculate the checksum of ubx messages, and if this code is executed as __main__, can be used to check and output checksums by placing the 'ubx byte-code in question' towards the top of the code after "message = ".
 
 Eventually, this file will handle the ubx-pvt messages, much as micropyGPS or as_GPS do for NMEA, and those files will be unneeded.
+
 # SD Card
 
+A microSD adapter may have pins soldered to it for breadboard use since the SD card and the Pico both talk at 3v3. DO NOT TRY THIS WITH a 5v ARDUINO!
 
+![image](https://github.com/Teufelauto/pico-telemetry/blob/main/images/SD_Card_Adapter_Pins.jpg)
 
----------------------+             Connects to:
-                   []  \   <-- No connection      
-                     [] |  CS       SPIx SCK
-                     [] |  MOSI     SPIx TX      
-       Micro to      [] |  GND      Ground     
-         SD          [] |  VCC      3v3(OUT)  
-       Adapter       [] |  SCK      SPIx SCK   
-                     [] |  GND      Ground    
-                     [] |  MISO     SPIx RX   
-                     [] |  <-- No connection 
-------------------------+
+Parden the awful soldering. I know it's bad. I was in a hurry, and had no flux to give it.
 
