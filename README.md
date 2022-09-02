@@ -9,8 +9,9 @@ Vehicle telemetry logging for the Raspberry Pi Pico written in microPython for n
 These libraries are required in the pico's lib folder:
  * UBX_PICO.py file created in this repository for certain communications with the M8C gps module
  * [microPython driver sdcard.py](https://github.com/micropython/micropython/tree/master/drivers/sdcard)
- * [ozzmaker's IMU_I2C.py](https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython) and [LSM6DSL.py](https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython) required to communicate with the IMU.
-One of the following:
+ * [ozzmaker's IMU_I2C.py](https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython) and [LSM6DSL.py](https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython) required to communicate with the IMU. IMU_I2C.py must be modified to specify the correct pins on your Pico, as the functionality to change it programatically was not included in the driver.
+
+   And one of the following:
  * [Peter Hinch's as_GPS.py](https://github.com/peterhinch/micropython-async/tree/master/v3/as_drivers/as_GPS) for the async version.
  * [Calvin McCoy's micropyGPS.py](https://github.com/inmcm/micropyGPS) if choosing the non-async version. Version to be depreciated due to performance issues without async.
 ## UBX_PICO.py
@@ -25,6 +26,6 @@ Includes initial setup of the u-blox m8c GPS for:
  * Disabling extranious ubx messages that are not needed to reduce UART clutter
  * Enabling the ubx-pvt message, which is similar to NMEA's RMC, but in the u-blox's native format
 
-Includes a function to calculate the checksum of ubx messages, and if run by itself, can be used to check and output checksums by placing the byte-code in question towards the top of the file after "message = ".
+Includes a function to calculate the checksum of ubx messages, and if run by itself, can be used to check and output checksums by placing the 'byte-code in question' towards the top of the code after "message = ".
 
 Eventually, this file will handle the ubx-pvt messages, much as micropyGPS or as_GPS do for NMEA, and those files will be unneeded.
