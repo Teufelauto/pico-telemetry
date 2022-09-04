@@ -1,5 +1,5 @@
 # pico-telemetry
-Vehicle telemetry logging for the Raspberry Pi Pico written in microPython 1.19.1 for now. Future plans are for migrating to C++ if python proves to be a bottleneck. (I had a semester of 'Intro to C++' at university, so it should be easy! ;-) -Last words of a Mechanical Engineering Technologist.
+Vehicle telemetry logging for the Raspberry Pi Pico written in microPython 1.19.1 for now. Future plans are for migrating to C++ if Python proves to be a bottleneck. (I had a semester of 'Intro to C++' at university, so it should be easy! ;-) -Last words of a Mechanical Engineering Technologist.
 
 This software is in very early development, and I'm very much an amateur. Do not expect a functioning datalogger for your race car. You will never be able to use this with MoTeC i2. Their file type is proprietary so you will buy their superior products. I do intend to eventually create a way to combine, at least some of, the data with a 60 fps onboard video. The [Road-Keeper](https://www.race-keeper.com/) would be a much better option than this project, but it's just a hobby. Use of these files is at your own risk.
 
@@ -19,7 +19,7 @@ Using Thonny, create a folder on the pico named "lib". These files are placed in
 
    And one of the following:
  * [Peter Hinch's as_GPS.py](https://github.com/peterhinch/micropython-async/tree/master/v3/as_drivers/as_GPS) for the async version.
- * [Calvin McCoy's micropyGPS.py](https://github.com/inmcm/micropyGPS) if choosing the non-async version. Version to be depreciated due to performance issues without async. Currently still needed for async version.
+ * [Calvin McCoy's micropyGPS.py](https://github.com/inmcm/micropyGPS) if choosing the non-async version. Version deprecated due to change in focus, but has basic functionality.
 ## telemetry_async.py
 Rename as main.py and place in Pico's root
 
