@@ -63,7 +63,7 @@ filename_extension = '.csv'          # Recommend ".csv" as data is comma delinia
 # File's column header (Date only written once per file for code speed and
 #  file write speed. The first column will be mostly blank except first few rows.
 
-header = 'Date,Time,Latitude,Longitude,Speed,Course,xG,yG,zG,xGyro,yGyro,zGyro,mag_heading,throttle_position,brake_pressure,steering_angle,rpm,blinker_fluid_level,nitrous_active,water_injection'
+header = 'Date,Time,Latitude,Longitude,Speed,Course,xG,yG,zG,xGyro,yGyro,zGyro,mag_heading,throttle_position,brake_pressure,steering_angle,rpm,LF_damper_position,RF_damper_position,LR_damper_position,RR_damper_position'
 
 
 # Set the constants below to match your wiring
@@ -89,7 +89,7 @@ GPS_FAST_BAUD      = const(9600)     # 9600, 19200, 38400, 57600, 115200 (9600 f
 GPS_PPS_PIN        = const(20)       # Pin 20 or 22 (ideally)
 
 # GPS Message output setup ----------------------------------------------------
-GPS_UPDATE_FREQ      = const(10)     # (Hz) 1, 2, 5, 10, 20? (1 factory default)
+GPS_UPDATE_FREQ      = const(1)     # (Hz) 1, 2, 5, 10, 20? (1 factory default)
 DISABLE_NMEA_CLUTTER = const(True)   # Removes all NMEA messages except GNRMC from output
 DISABLE_RMC          = const(False)  # Removes GNRMC from output
 DISABLE_UBX_CLUTTER  = const(True)   # Removes several ubx messages from output
@@ -106,12 +106,75 @@ ADC_SCK_PIN         = const(10)        # Pins for SPI0 [2, 6, 18] for SPI1 [10, 
 ADC_MOSI_TX_PIN     = const(11)        # Pins for SPI0 [3, 7, 19] for SPI1 [11, 15]
 
 ###########
-# classes #
+# Classes #
 ###########
 
+class WriteFlags:
+    # instead of using Globals for talking between cores
+    def __init__(self, write_string='', new_data_flag=False):
+        self.write_string = write_string
+        self.new_data_flag = new_data_flag
 
 
+class DataLines:
+    # Experiment for faster line creation
+    def __init__(self):
+        pass
+    
 
+class TimeSuck:
+    # A class for collecting time deltas
+    def __init__(self):
+        self.lower_bound = 0  # to keep plotter scaled
+        self.upper_bound = 10 # to keep plotter scaled
+        self.timcon = 0 # concatenate time string   ~.6ms, sometimes 1.1ms
+        self.get_current_time_timer = 0  #          ~1.5ms
+        self.gpsget = 0 # time to get gps data      ~7-8ms
+        self.gpscon = 0 # time to concatenate gps   ~1-2ms
+        self.imuget = 0 #                           ~7-8ms
+        self.imucon = 0 #                           ~2-3ms
+        self.acqget = 0 #                           ~5ms
+        self.acqcon = 0 #                           ~3ms
+        self.addline = 0 # concat gps, imu, acq     ~2.5ms but sometimes 11ms
+        self.write_timer = 0 # time to append .csv file in milliseconds
+        self.current_time_float = 0 #
+        self.cycle_timer = 0 #                      ~23ms but up to 50 on gps cycle
+    
+    def selected_data(self, ts):
+        # Choose any data to print to Shell for Plotter
+        
+#         print(f'L bound: {ts.lower_bound} Con Time: {ts.timcon}')
+#         print(f'L bound: {ts.lower_bound} Current time func: {ts.get_current_time_timer}')
+        print(f'L bound: {ts.lower_bound} Get gps: {ts.gpsget}') 
+#         print(f'L bound: {ts.lower_bound} Con gps: {ts.gpscon}')
+#         print(f'L bound: {ts.lower_bound} Get imu: {ts.imuget}')
+#         print(f'L bound: {ts.lower_bound} Con imu: {ts.imucon}')
+#         print(f'L bound: {ts.lower_bound} Get acq: {ts.acqget}')
+#         print(f'L bound: {ts.lower_bound} Con acq: {ts.acqcon}')
+#         print(f'L bound: {ts.lower_bound} Add Line: {ts.addline}')
+#         print(f'L bound: {ts.lower_bound} Write time: {ts.write_timer}')
+#         print(f'L bound: {ts.lower_bound} Current time: {ts.current_time_float}')
+#         print(f'L bound: {ts.lower_bound} Time since fix: {my_gps.time_since_fix()}')
+#         print(f'L bound: {ts.lower_bound} Data Line: {ts.cycle_timer}')
+
+# # Parts to be placed in print statements as desired
+#         L bound: {ts.lower_bound}
+#         U bound: {ts.upper_bound}
+#         Con Time: {ts.timcon}
+#         Current time func: {ts.get_current_time_timer}
+#         Get gps: {ts.gpsget}
+#         Con gps: {ts.gpscon}
+#         Get imu: {ts.imuget}
+#         Con imu: {ts.imucon}
+#         Get acq: {ts.acqget}
+#         Con acq: {ts.acqcon}
+#         Add Line: {ts.addline}
+#         Write time: {ts.write_timer}
+#         Current time: {ts.current_time_float}
+#         Time since fix: {my_gps.time_since_fix()}
+#         Data Line: {ts.cycle_timer}
+          
+        
 #############
 # Functions #
 #############
@@ -146,25 +209,35 @@ def get_current_time():
     # create current time as string 'hhmmss.sss' and as a float
     a = '.'
     m = 'Millisecond overflow.'
+    
+    get_current_time_start = time.ticks_us() #start timer
+
     timestamp = my_gps.local_time # tuple of integers
     ts_ms = my_gps.msecs # get the milliseconds portion of the timestamp
     ms_since_fix = my_gps.time_since_fix() # milliseconds since the timestamp
     
     milli = ts_ms + ms_since_fix
     
-    if milli > 999:
-        print(f'{m}')
+#     if milli > 999:
+#         print(f'{m}')
+    
+    start_timer = time.ticks_us() #start timer
     
     current_time_string = f'{timestamp[0]:02d}{timestamp[1]:02d}{timestamp[2]:02d}{a}{milli:003d}'
-
+    
+    TS.timcon= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff    
+    
     current_time_float = float(current_time_string) # not yet used, but might be useful for timing. msecs may be enough for that purpose, though.
- 
+
+    TS.get_current_time_timer = time.ticks_diff(time.ticks_us(), get_current_time_start)# get timer diff
+
     return current_time_string, current_time_float # adds hundredths and thousandths or, centiseconds ;-P and milliseconds to the time
 
 
 async def get_gps_data():
-    # cycle until GPS update recieved
     b = ','
+    
+    start_timer = time.ticks_us() #start timer
 
     await my_gps.data_received()
         
@@ -174,42 +247,69 @@ async def get_gps_data():
     else: lat_sign = '-'
         
     lon = my_gps.longitude()
-    if lon[1] == 'W':
-        lon_sign = '-'
-    else: lon_sign = ''
+    if lon[1] == 'E':
+        lon_sign = ''
+    else: lon_sign = '-'
     
     speed = my_gps.speed(SPEED_UNITS)
     course = my_gps.course
+    
+    TS.gpsget= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
+    
+    start_timer = time.ticks_us() #start timer
 
     gps_data = f'{lat_sign}{lat[0]:3.5f}{b}{lon_sign}{lon[0]:3.5f}{b}{speed:3.1f}{b}{course:3.1f}{b}'
     
+    TS.gpscon= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
+        
     return gps_data
 
 
 def get_imu_data():
     b = ','
-    xG = (IMU.readACCx() * 0.244)/1000 # .244 may become variable, and zero compensation may need implemented
-    yG = (IMU.readACCy() * 0.244)/1000
-    zG = (IMU.readACCz() * 0.244)/1000
+    
+    start_timer = time.ticks_us() #start timer
+    
+    xG = IMU.readACCx() #* 0.244)/1000 # .244 may become variable, and zero compensation may need implemented
+    yG = IMU.readACCy() #* 0.244)/1000
+    zG = IMU.readACCz() #* 0.244)/1000
     xGyro = IMU.readGYRx()
     yGyro = IMU.readGYRy()
     zGyro = IMU.readGYRz()
     mag_heading = IMU.readGYRz() # placeholder until implemented.
-    imu_data = f'{xG:1.2f}{b}{yG:1.2f}{b}{zG:1.2f}{b}{xGyro}{b}{xGyro}{b}{xGyro}{b}'
+    
+    TS.imuget= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
+    start_timer = time.ticks_us() #start timer
+    
+    imu_data = f'{xG:1.2f}{b}{yG:1.2f}{b}{zG:1.2f}{b}{xGyro}{b}{yGyro}{b}{zGyro}{b}{mag_heading}{b}'
+    
+    TS.imucon= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
+    
     return imu_data
 
 
     # placeholder of time consuming data for testing. 3 analog signals, unless MCP3208 over spi
 def get_acq_data():
     b = ','
-    throttle_position = (my_gps.time_since_fix() * 244)/100
-    brake_pressure = (my_gps.time_since_fix() * 0.2)/100
-    steering_angle = my_gps.time_since_fix()
-    rpm = 5280 + my_gps.time_since_fix()
-    blinker_fluid = led.value()
-    nitrous_active = IMU.readACCz()
-    water_injection = led.value()
-    acq_data = f'{throttle_position}{b}{brake_pressure}{b}{steering_angle}{b}{rpm}{b}{blinker_fluid}{b}{nitrous_active}{b}{water_injection}' # put no comma at end
+    
+    start_timer = time.ticks_us() #start timer
+
+    throttle_position  = IMU.readGYRx()
+    brake_pressure     = IMU.readGYRx()
+    steering_angle     = IMU.readGYRx()
+    rpm                = IMU.readGYRx()
+    LF_damper_position = IMU.readGYRx()
+    RF_damper_position = led.value()
+    LR_damper_position = led.value()
+    RR_damper_position = led.value()
+
+    TS.acqget = time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
+    start_timer = time.ticks_us() #start timer
+
+    acq_data = f'{throttle_position}{b}{brake_pressure}{b}{steering_angle}{b}{rpm}{b}{LF_damper_position}{b}{RF_damper_position}{b}{LR_damper_position}{b}{RR_damper_position}' # put no comma at end
+
+    TS.acqcon= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
+    
     return acq_data
 
 
@@ -217,17 +317,21 @@ def add_data_line(data_string, current_time_float, imu_data, acq_data, gps_data=
     # Adds a line of data to the string. takes 2-3 ms
     b = ','
     c = '\r\n'
-#     a = ' ms to write line'
+    start_timer = time.ticks_us() #start timer
+    
     if gps_data == None: # data between gps fix
-#         start_timer = time.ticks_ms() #start timer
+#         start_timer = time.ticks_us() #start timer
         
         data_string = f'{data_string}{b}{current_time_float}{b}{b}{b}{b}{b}{imu_data}{acq_data}{c}' # gps_data has 4 items
 
-#         diff_timer= time.ticks_diff(time.ticks_ms(), start_timer)# get timer diff
-#         print(f'{diff_timer}{a}')# print timer
+#         diff_timer= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
+#         w = ' ms to write gps data'
+#         print(f'{diff_timer}{w}')# print timer
         
     else: # just got a gps fix       
         data_string = f'{data_string}{b}{current_time_float}{b}{gps_data}{imu_data}{acq_data}{c}'
+
+    TS.addline= time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
 
     return data_string
 
@@ -238,80 +342,76 @@ def add_data_line(data_string, current_time_float, imu_data, acq_data, gps_data=
  
 def write_data():
     # Run on second thread, 'cause it takes so long to write to sd card. about 150 ms
-    global write_string # a class would be more elegant
-    global new_data_flag
-    new_data_flag = False
-    a = ' ms write time'
+    
+    WF.new_data_flag = False
     
     while True: # keep core 1 active
         
-        if new_data_flag == True:
+        if WF.new_data_flag == True:
         
             baton.acquire() # we dont want main loop to overwrite write_string or call function while still writing
             led.on()
             start_timer = time.ticks_ms() #start timer
             
             with open(filename, "a") as file:  # "a" for appending
-                file.write(write_string)
+                file.write(WF.write_string)
             
-            new_data_flag = False
+            WF.new_data_flag = False
             
             baton.release()
             
             led.off()
-            diff_timer= time.ticks_diff(time.ticks_ms(), start_timer)# get timer diff
-            print(f'{diff_timer}{a}')# print timer
+            TS.write_timer = time.ticks_diff(time.ticks_ms(), start_timer)# get timer diff
             
         time.sleep_ms(5) # Keep the if-True statement from hammering the core
 
-
+  
  #######################
  # Main Loop on Core 0 #
  #######################
 
 async def main():
-    global write_string # a class would be more elegant
-    global new_data_flag
     data_string = ''
-    new_data_flag = False
 
     while True: 
 #     if pps.value() == 1: # when timepulse hits, get message.
-        for ii in range(2):
+        for _ in range(2):
             # 2 gps fixes, 12 lines of data collected before
             # incremental save. More lines take long time to concatenate,
             # less lines take too long to save.
             
+            cycle_timer_start = time.ticks_ms() #start timer before getting gps
+
             gps_data = asyncio.run(get_gps_data())
             # Need to deal with no message received
     
             #   Need better timing between gps time pulses
             for i in range(6): # 6 loops per single 10hz gps fix is 60hz
-                
-                if i != 0:# second through sixth loops don't get fresh time from get_gps_data, so must get own time.
-                    current_time_string, current_time_float = get_current_time()
-                    print(f'{ii} {i} {current_time_string}')
-                    
+                if i !=0: cycle_timer_start = time.ticks_ms() #restart timer if not fresh gps
+                current_time_string, current_time_float = get_current_time()
                 imu_data = get_imu_data() # Gather IMU data
                 acq_data = get_acq_data() # Gather adc etc data
-                
-                if i == 0: # first time through adds new gps data to string
-                    current_time_string, current_time_float = get_current_time()
+                 
+                if i == 0: # first time through adds new gps data to string                    
                     data_string = add_data_line(data_string, current_time_string,
                                                imu_data, acq_data, gps_data)
-                    print(f'{ii} {i} {current_time_string}')
                     
-                else : # second through sixth loops dont send gps data
+                else : # second through sixth loops dont send gps data to function
                     data_string = add_data_line(data_string, current_time_string,
                                                imu_data, acq_data)
-                z = my_gps.time_since_fix()
-                print(z)
+                    
+#                 TS.current_time_float = current_time_float # for experimenting
+                TS.cycle_timer = time.ticks_diff(time.ticks_ms(), cycle_timer_start)# get timer diff
+                TS.selected_data(TS) # Print timing data at 60hz
+                
+        # For Loops data collection done. Time for save
         baton.acquire() # pause here until core 1 releases lock if necessary
-        new_data_flag = True
-        write_string = data_string
+        WF.write_string = data_string 
+        WF.new_data_flag = True
         baton.release() # the data for the write is ready, so let core 1 write
         data_string = '' # reset the working variable
-
+        
+#         TS.selected_data(TS) # Print timing data at 5hz
 
 #####################
 # Get Program Going #
@@ -319,10 +419,12 @@ async def main():
 
 # Program prep ###############################################################
 
+WF = WriteFlags() # initialize the class flags for file saving
+TS = TimeSuck() # initialize the troubleshooting timer class
 
+baton = _thread.allocate_lock() # create the baton to pass when saving data
 
-baton = _thread.allocate_lock()
-led = Pin(25, Pin.OUT)
+led = Pin(25, Pin.OUT) # on-board LED used to show saving data
 led.off()
 
 # SD Card Mounting -----------------------------------------------------------
@@ -373,20 +475,5 @@ time.sleep(1)
 _thread.start_new_thread(write_data, ()) 
 
 # Start Main Loop on Core 0---------------------------------------------------
-
-
-def test():
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print('Interrupted')
-    finally:
-        asyncio.new_event_loop()
-        print('How about a game of chess?')
-
-test()
-
-
-
-
+asyncio.run(main())
 
