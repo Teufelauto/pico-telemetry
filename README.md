@@ -25,7 +25,7 @@ Rename as main.py and place in Pico's root
 
 Creates a file named {whateverYouWish}{yymmddhhmmss}.csv to the SD card after the GPS has initialized. GPS data is collected at 10hz thanks to stripping unnecessary messages from the UART stream. For 60hz telemetry recording, the IMU and various sensors must collect data 6 times per gps cycle. 
 
-The second core of the RP2040 is used for writing to the SD card, since writing just 12 lines of data every 200ms into the .csv takes upwards of 50ms. 100 lines takes barely any more time to write, but the string concatenation is too time consuming with only 16ms available between data collection points. I'm currently using f-strings to concatenate. 
+The second core of the RP2040 is used for writing to the SD card, since writing just 12 lines of data every 200ms into the .csv takes upwards of 160ms. 100 lines takes barely any more time to write, but the string concatenation is too time consuming with only 16ms available between data collection points. I'm currently using f-strings to concatenate. Looking into .join to see if it will provide a benefit.
 
 The convenience (and 'open source-iness' of the output file) of ASCII formatting may need to be cut to save processing time. The ubx-pvt message from the gps isn't ASCII, so once that's implemented, it's a natural progression to ditch ASCII. It will require an additional program (Python 3) to convert to a .csv so anyone can do anything with the data. 
 
