@@ -38,6 +38,7 @@ This file has code to speak the language of the u-blox GPS receiver.
 Includes initial setup of the u-blox m8c GPS for:
  * Cold Reboot (for troubleshooting)
  * Setting update rate of GPS to 1, 2, 5, 10 or 20hz. (20hz functionality unknown, but the byte-code is there)
+ * Setting the Time Pulse output frequency to 1, 2, 5, or 10Hz. Zero is on rising edge. Has 10% duty cycle, so high for 10ms at 10Hz.
  * Setting the baud rate of the gps
  * Disabling extranious NMEA messages that we don't need, and take precious time to transmit over UART
  * Disabling the RMC message (the most useful NMEA message) if the ubx protocol is used
