@@ -46,6 +46,7 @@ import sdcard  # https://github.com/micropython/micropython/tree/master/drivers/
 import IMU_I2C as IMU # MUST be modified to match i2c pinout # https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython
 #      LSM6DSL.py - install alongside IMU_I2C. https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython
 from as_GPS import * # https://github.com/peterhinch/micropython-async/tree/master/v3/as_drivers/as_GPS
+# import aadc  # future
 import UBX_PICO as ubx # by Jamie Halford for talking to the u-blox CAM M8 GPS receiver on the Berry
 
 
@@ -66,7 +67,7 @@ filename_extension = '.csv'          # Recommend ".csv" as data is comma delinia
 header = 'Date,Time,Latitude,Longitude,Speed,Course,xG,yG,zG,xGyro,yGyro,zGyro,mag_heading,throttle_position,brake_pressure,steering_angle,rpm,LF_damper_position,RF_damper_position,LR_damper_position,RR_damper_position'
 
 
-# Set the constants below to match your wiring
+# Set the constants below to match your wiring and configuration
 # SD Card SPI setup ---------------------------------------------------------
 SD_SPI_NUMBER      = const(0)        # 0, 1
 SD_MISO_RX_PIN     = const(4)        # Pins for SPI0 [0, 4, 16] for SPI1 [8, 12]
@@ -86,10 +87,11 @@ GPS_UART_RX_PIN    = const(1)        # Pins for UART0 [1, 13, 17] for UART1 [5, 
 GPS_FAST_BAUD      = const(9600)     # 9600, 19200, 38400, 57600, 115200 (9600 factory default)
 
 # GPS Sync Clock -------------------------------------------------------------
-GPS_PPS_PIN        = const(20)       # Pin 20 or 22 (ideally)
+GPS_PPS_PIN        = const(20)       # Pin 20 or 22 (ideally for setting RTC?) but any will work
+PULSES_PER_SEC     = const(10)       # (Hz) 1, 2, 5, 10 Set to match GPS_UPDATE_FREQ (seperate for testing purposes)
 
 # GPS Message output setup ----------------------------------------------------
-GPS_UPDATE_FREQ      = const(1)     # (Hz) 1, 2, 5, 10, 20? (1 factory default)
+GPS_UPDATE_FREQ      = const(10)     # (Hz) 1, 2, 5, 10, 20? (1 factory default)
 DISABLE_NMEA_CLUTTER = const(True)   # Removes all NMEA messages except GNRMC from output
 DISABLE_RMC          = const(False)  # Removes GNRMC from output
 DISABLE_UBX_CLUTTER  = const(True)   # Removes several ubx messages from output
@@ -109,6 +111,20 @@ ADC_MOSI_TX_PIN     = const(11)        # Pins for SPI0 [3, 7, 19] for SPI1 [11, 
 # Classes #
 ###########
 
+class TimingPulse: # to eventually be put in UBX_PICO 
+    # usage ex: PPS.new_pulse = True
+    def __init__(self, pin):
+        self._pin = pin
+        self.sense = pin.value()
+        self.new_pulse = False
+        
+#     async def run(self):
+#         # check for timing pulse
+#         while True:
+#             self.sense = pin.value()
+#             await asyncio.sleep(0)
+
+
 class WriteFlags:
     # instead of using Globals for talking between cores
     def __init__(self, write_string='', new_data_flag=False):
@@ -118,6 +134,8 @@ class WriteFlags:
 
 class DataLines:
     # Experiment for faster line creation
+    # Use of a buffer might be helpful, but data is not of fixed size...
+    # Using async will help
     def __init__(self):
         pass
     
@@ -127,13 +145,18 @@ class TimeSuck:
     def __init__(self):
         self.lower_bound = 0  # to keep plotter scaled
         self.upper_bound = 10 # to keep plotter scaled
+        self.get_current_time_collect = 0 #retrieve time  ~
         self.timcon = 0 # concatenate time string   ~.6ms, sometimes 1.1ms
         self.get_current_time_timer = 0  #          ~1.5ms
-        self.gpsget = 0 # time to get gps data      ~7-8ms
+        self.waiting_for_gps_pulse = 0         
+        self.gpsget = 0 # time to get gps data      ~3ms  Huge problem.
+        # loop time too slow to catch each 100 ms time pulse. need async data gather?
+        
+        
         self.gpscon = 0 # time to concatenate gps   ~1-2ms
         self.imuget = 0 #                           ~7-8ms
         self.imucon = 0 #                           ~2-3ms
-        self.acqget = 0 #                           ~5ms
+        self.acqget = 0 #                           ~5ms but is placeholder function
         self.acqcon = 0 #                           ~3ms
         self.addline = 0 # concat gps, imu, acq     ~2.5ms but sometimes 11ms
         self.write_timer = 0 # time to append .csv file in milliseconds
@@ -142,10 +165,15 @@ class TimeSuck:
     
     def selected_data(self, ts):
         # Choose any data to print to Shell for Plotter
+        # Perhaps combining all concatenation into one .join is way to go.
+        # OR address writes.
         
+        print(f'L bound: {ts.lower_bound} Message delay: {ts.waiting_for_gps_pulse}')
+#         print(f'L bound: {ts.lower_bound} Get gps: {ts.gpsget} Data Line: {ts.cycle_timer}') 
+#         print(f'L bound: {ts.lower_bound} Time retrieval: {ts.get_current_time_collect}')
 #         print(f'L bound: {ts.lower_bound} Con Time: {ts.timcon}')
 #         print(f'L bound: {ts.lower_bound} Current time func: {ts.get_current_time_timer}')
-        print(f'L bound: {ts.lower_bound} Get gps: {ts.gpsget}') 
+#         print(f'L bound: {ts.lower_bound} Get gps: {ts.gpsget}') 
 #         print(f'L bound: {ts.lower_bound} Con gps: {ts.gpscon}')
 #         print(f'L bound: {ts.lower_bound} Get imu: {ts.imuget}')
 #         print(f'L bound: {ts.lower_bound} Con imu: {ts.imucon}')
@@ -156,24 +184,11 @@ class TimeSuck:
 #         print(f'L bound: {ts.lower_bound} Current time: {ts.current_time_float}')
 #         print(f'L bound: {ts.lower_bound} Time since fix: {my_gps.time_since_fix()}')
 #         print(f'L bound: {ts.lower_bound} Data Line: {ts.cycle_timer}')
-
-# # Parts to be placed in print statements as desired
-#         L bound: {ts.lower_bound}
-#         U bound: {ts.upper_bound}
-#         Con Time: {ts.timcon}
-#         Current time func: {ts.get_current_time_timer}
-#         Get gps: {ts.gpsget}
-#         Con gps: {ts.gpscon}
-#         Get imu: {ts.imuget}
-#         Con imu: {ts.imucon}
-#         Get acq: {ts.acqget}
-#         Con acq: {ts.acqcon}
-#         Add Line: {ts.addline}
-#         Write time: {ts.write_timer}
-#         Current time: {ts.current_time_float}
-#         Time since fix: {my_gps.time_since_fix()}
-#         Data Line: {ts.cycle_timer}
-          
+# # All concatenation events: 
+#         print(f'L bound: {ts.lower_bound} Con Time: {ts.timcon} Con gps: {ts.gpscon} Con imu: {ts.imucon} Con acq: {ts.acqcon} Add Line: {ts.addline}') 
+# # All Data gatering events:
+#         print(f'L bound: {ts.lower_bound} Get gps: {ts.gpsget} Get imu: {ts.imuget} Get acq: {ts.acqget}
+       
         
 #############
 # Functions #
@@ -220,6 +235,7 @@ def get_current_time():
     
 #     if milli > 999:
 #         print(f'{m}')
+    TS.get_current_time_collect = time.ticks_diff(time.ticks_us(), get_current_time_start)# get timer diff
     
     start_timer = time.ticks_us() #start timer
     
@@ -294,14 +310,14 @@ def get_acq_data():
     
     start_timer = time.ticks_us() #start timer
 
-    throttle_position  = IMU.readGYRx()
-    brake_pressure     = IMU.readGYRx()
-    steering_angle     = IMU.readGYRx()
-    rpm                = IMU.readGYRx()
-    LF_damper_position = IMU.readGYRx()
-    RF_damper_position = led.value()
-    LR_damper_position = led.value()
-    RR_damper_position = led.value()
+    throttle_position  = 1#IMU.readGYRx()
+    brake_pressure     = 1#IMU.readGYRx()
+    steering_angle     = 1#IMU.readGYRx()
+    rpm                = 1#IMU.readGYRx()
+    LF_damper_position = 1#IMU.readGYRx()
+    RF_damper_position = 1#led.value()
+    LR_damper_position = 1#led.value()
+    RR_damper_position = 1#led.value()
 
     TS.acqget = time.ticks_diff(time.ticks_us(), start_timer)# get timer diff
     start_timer = time.ticks_us() #start timer
@@ -374,20 +390,25 @@ async def main():
     data_string = ''
 
     while True: 
-#     if pps.value() == 1: # when timepulse hits, get message.
+     
         for _ in range(2):
             # 2 gps fixes, 12 lines of data collected before
             # incremental save. More lines take long time to concatenate,
             # less lines take too long to save.
-            
-            cycle_timer_start = time.ticks_ms() #start timer before getting gps
+            wait_pulse_start = time.ticks_ms() #start timer
+            while pps_pin.value() == 0: # if = 1, continue on to collect gps message
+                await asyncio.sleep(0)
+            TS.waiting_for_gps_pulse = time.ticks_diff(time.ticks_ms(), wait_pulse_start)# get timer diff
 
-            gps_data = asyncio.run(get_gps_data())
+            cycle_timer_start = time.ticks_ms() #start timer before getting gps
+            gps_data = await get_gps_data()
+            
             # Need to deal with no message received
-    
+
             #   Need better timing between gps time pulses
             for i in range(6): # 6 loops per single 10hz gps fix is 60hz
-                if i !=0: cycle_timer_start = time.ticks_ms() #restart timer if not fresh gps
+                if i !=0:
+                    cycle_timer_start = time.ticks_ms() #restart timer if not fresh gps
                 current_time_string, current_time_float = get_current_time()
                 imu_data = get_imu_data() # Gather IMU data
                 acq_data = get_acq_data() # Gather adc etc data
@@ -449,23 +470,23 @@ adc = adc_pico.ADConvert(adc_spi,Pin(ADC_CS_PIN, Pin.OUT))
 # GPS Communication Initialization --------------------------------------------
 # GPS receiver setup
 ubx.setup(GPS_UART_NUMBER, GPS_UART_TX_PIN, GPS_UART_RX_PIN,
-          GPS_UPDATE_FREQ, GPS_FAST_BAUD, GPS_COLD_REBOOT,DISABLE_NMEA_CLUTTER,
+          GPS_UPDATE_FREQ, GPS_FAST_BAUD, PULSES_PER_SEC, GPS_COLD_REBOOT,DISABLE_NMEA_CLUTTER,
           DISABLE_RMC, DISABLE_UBX_CLUTTER, ENABLE_UBX_PVT)
 
-# Set pico UART baud rate to match the GPS output 
+# Set pico UART baud rate to match the new GPS output 
 uartGPS = UART(GPS_UART_NUMBER,baudrate= GPS_FAST_BAUD, tx=Pin(GPS_UART_TX_PIN),
                rx=Pin(GPS_UART_RX_PIN), bits=8, parity=None, stop=1)
 print(f'pico fast baudrate set to {GPS_FAST_BAUD}' )
 time.sleep_ms(1000)
 
-# Async_GPS setup 
+# Async_GPS setup ------------------------------------------------------
 sreader = asyncio.StreamReader(uartGPS)  # Create a StreamReader
 my_gps = AS_GPS(sreader,LOCAL_OFFSET)  # Instantiate GPS                                                                          
 
-# Clock -------------------------------------------------------------
-# rtc = machine.RTC() # Limited value
-pps = Pin(GPS_PPS_PIN, Pin.IN, Pin.PULL_DOWN) # rising edge is time pulse from gps.
-# Would like to change to 10 hz pulse for better event timing
+# Clock / Timing ----------------------------------------------------------
+pps_pin = Pin(GPS_PPS_PIN, Pin.IN, Pin.PULL_DOWN) # rising edge is time pulse from gps.
+TP = TimingPulse(pps_pin) # instantiate the timing pulse from gps
+# rtc = machine.RTC() # Limited value?
 
 # File creation --------------------------------------------------------------
 filename = asyncio.run(create_filename()) # uses core 0 for initial startup without threading
