@@ -15,10 +15,10 @@ This software is in very early development, and I'm very much an amateur. Do not
 Using Thonny, create a folder on the pico named "lib". These files are placed in the pico's lib folder:
  * UBX_PICO.py file in this repository for certain communications with the M8C gps module
  * [microPython driver sdcard.py](https://github.com/micropython/micropython/tree/master/drivers/sdcard)
- * [ozzmaker's IMU_I2C.py](https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython) and [LSM6DSL.py](https://github.com/ozzmaker/BerryIMU/tree/master/PicoMicroPython) required to communicate with the IMU. IMU_I2C.py must be modified to specify the correct pins on your Pico, as the functionality to change it programatically was not included in the driver.
+ * My forks of [ozzmaker's IMU_I2C.py](https://github.com/Teufelauto/BerryIMU-for-Pico/blob/Classes-for-Pico-Libraries/PicoMicroPython/IMU_I2C.py) and [LSM6DSL.py](https://github.com/Teufelauto/BerryIMU-for-Pico/blob/Classes-for-Pico-Libraries/PicoMicroPython/LSM6DSL.py) required to communicate with the IMU. IMU_I2C.py was modified to specify the correct pins on your Pico via a Class, as the functionality to change it programatically was not included in the original driver. LSM6DSL was modified to correct an error.
 
    And one of the following:
- * [Peter Hinch's as_GPS.py](https://github.com/peterhinch/micropython-async/tree/master/v3/as_drivers/as_GPS) for the async version.
+ * My fork of [Peter Hinch's as_GPS.py](https://github.com/Teufelauto/micropython-async-for-pico/blob/Fast-GPS-Frequency/v3/as_drivers/as_GPS/as_GPS.py) for the async version. Had to slightly modify for fast GPS update frequency.
  * [Calvin McCoy's micropyGPS.py](https://github.com/inmcm/micropyGPS) if choosing the non-async version. Version deprecated due to change in focus, but has basic functionality.
 ## telemetry_async.py
 Rename as main.py and place in Pico's root
